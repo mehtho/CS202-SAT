@@ -3,71 +3,43 @@ import random
 def generate_test_case(num_vars, num_clauses, clause_length):
     test_case = []
     for _ in range(num_clauses):
-        clause = []
-        for _ in range(clause_length):
+        clause = set()
+        while len(clause) < clause_length:
             var = random.randint(1, num_vars)
             negated = random.choice([True, False])
-            clause.append(-var if negated else var)
-        test_case.append(clause)
+            clause.add(-var if negated else var)
+        test_case.append(list(clause))
     return test_case
 
 
-def dpll(clauses, assignment):
-    if not clauses:
+def dpll(formula, assignment):
+    if not formula:
         return True, assignment
-    if any(not clause for clause in clauses):
-        return False, None
-
-    unassigned_var = None
-    for clause in clauses:
-        for literal in clause:
-            var = abs(literal)
-            if var not in assignment:
-                unassigned_var = var
-                break
-        if unassigned_var:
-            break
-
-    new_clauses = [clause[:] for clause in clauses]
-    for value in [True, False]:
-        assignment[unassigned_var] = value
-        simplified_clauses = simplify_clauses(new_clauses, unassigned_var, value)
-        sat, solution = dpll(simplified_clauses, assignment)
-        if sat:
-            return True, solution
-        del assignment[unassigned_var]
-
-    return False, None
-
-
-def simplify_clauses(clauses, var, value):
-    simplified_clauses = []
-    for clause in clauses:
-        new_clause = []
-        for literal in clause:
-            if literal == var and value or literal == -var and not value:
-                break
-            if literal != var and literal != -var:
-                new_clause.append(literal)
-        else:
-            simplified_clauses.append(new_clause)
-    return simplified_clauses
-
-
-def main():
-    num_vars = 100
-    num_clauses = 10
-    clause_length = 10
-    test_case = generate_test_case(num_vars, num_clauses, clause_length)
-    print("Generated test case (CNF):", test_case)
     
-    sat, assignment = dpll(test_case, {})
-    if sat:
-        print("Satisfiable")
-        print("Assignment:", assignment)
-    else:
-        print("Unsatisfiable")
+    if any(not clause for clause in formula):
+        return False, assignment
+    
+    unit_clauses = [c for c in formula if len(c) == 1]
+    if unit_clauses:
+        unit = unit_clauses[0][0]
+        new_formula = [[l for l in c if l != -unit] for c in formula if unit not in c]
+        return dpll(new_formula, assignment + [unit])
+    
+    variable = abs(formula[0][0])
+    
+    for value in [variable, -variable]:
+        new_formula = [[l for l in c if l != -value] for c in formula if value not in c]
+        result, new_assignment = dpll(new_formula, assignment + [value])
+        if result:
+            return result, new_assignment
 
+    return False, assignment
 
-if __name__ == "__main__":
-    main()
+num_vars = 2
+num_clauses = 2
+clause_length = 2
+test_case = generate_test_case(num_vars, num_clauses, clause_length)
+result, assignment = dpll(test_case, [])
+print(test_case)
+print("Satisfiable:", result)
+print("Assignment:", assignment)
