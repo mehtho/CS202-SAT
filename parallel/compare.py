@@ -5,6 +5,7 @@ from pysat.solvers import Glucose3
 import pandas as pd 
 import numpy as np
 import threading
+import math
 
 class test_case:
     def __init__(self, num_vars, num_clauses, clause_length, case):
@@ -22,6 +23,9 @@ def generate_test_case(num_vars, num_clauses, clause_length):
             negated = random.choice([True, False])
             clause.add(-var if negated else var)
         test_case.append(list(clause))
+    
+    print('made test case #', num_vars)
+
     return test_case
 
 # If the formula is empty, it is trivially satisfiable, and the current assignment is returned.
@@ -68,9 +72,11 @@ def naive(formula):
 
 def naive_thread(test_cases):
     data = []
-    for tc in test_cases:
+    for idx, tc in enumerate(test_cases):
         naive_time = timeit.timeit(lambda: naive(tc.case), number=1)
         data.append((tc.num_vars, tc.num_clauses, tc.clause_length, naive_time))
+
+        print('solved naive #', idx)
 
     pd.DataFrame(data, columns=['num_vars', 'num_clauses', 'clause_length', 'naive_time']).to_csv('naive.csv')
 
@@ -105,52 +111,56 @@ def dpll(formula, assignment):
     
 def dpll_thread(test_cases):
     data = []
-    for tc in test_cases:
+    for idx, tc in enumerate(test_cases):
         dpll_time = timeit.timeit(lambda: dpll(tc.case, []), number=1)
         data.append((tc.num_vars, tc.num_clauses, tc.clause_length, dpll_time))
+
+        print('solved dpll #', idx)
 
     pd.DataFrame(data, columns=['num_vars', 'num_clauses', 'clause_length', 'dpll_time']).to_csv('dpll.csv')
 
 def cdcl_thread(test_cases):
     data = []
     solver = Glucose3()
-    for tc in test_cases:
+    for idx, tc in enumerate(test_cases):
         for clause in tc.case:
             solver.add_clause(clause)
 
         cdcl_time = timeit.timeit(lambda: solver.solve, number=1)
-        data.append((num_vars, num_clauses, clause_length, cdcl_time))
+        data.append((tc.num_vars, tc.num_clauses, tc.clause_length, cdcl_time))
+        print('solved cdcl #', idx)
     
     pd.DataFrame(data, columns=['num_vars', 'num_clauses', 'clause_length', 'cdcl_time']).to_csv('cdcl.csv')
 
 test_cases = []
-for i in range(1, 23):
+for i in range(10, 1200):
     num_vars = i
-    num_clauses = 2**i
-    clause_length = 2
+    num_clauses = 4 * i * max(int(math.log(i)), 1)
+    clause_length = 10
     test_cases.append(test_case(num_vars, num_clauses, clause_length, generate_test_case(num_vars, num_clauses, clause_length)))
     
-t1 = threading.Thread(target=naive_thread, args=[test_cases[:20]])
-t2 = threading.Thread(target=dpll_thread, args=[test_cases])
+# t1 = threading.Thread(target=naive_thread, args=[test_cases[:20]])
+# t2 = threading.Thread(target=dpll_thread, args=[test_cases])
 t3 = threading.Thread(target=cdcl_thread, args=[test_cases])
 
-t1.start()
-t2.start()
+# t1.start()
+# t2.start()
 t3.start()
 
-t1.join()
-t2.join()
+# t1.join()
+# t2.join()
 t3.join()
 
-df3 = pd.read_csv("dpll.csv")
-df2 = pd.read_csv("cdcl.csv")
-df1 = pd.read_csv("naive.csv")
+df3 = pd.read_csv("cdcl.csv")
+# df2 = pd.read_csv("dpll.csv")
+# df1 = pd.read_csv("naive.csv")
 
-df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.dpll_time, df2.cdcl_time, df1.naive_time]).transpose()
-df4.to_csv('combined.csv')
+# df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time, df1.naive_time]).transpose()
+# print(df4.shape)
+# df4.to_csv('combined.csv')
 
-ax = df4.plot(kind="scatter", x="num_vars",y="dpll_time", color="r", label="dpll")
-df4.plot(kind="scatter", x="num_vars",y="cdcl_time", color="g", label="cdcl", ax=ax)
-df4.plot(kind="scatter", x="num_vars",y="naive_time", color="b", label="naive", ax=ax)
+# ax = df4.plot(kind="scatter", x="num_vars",y="dpll_time", color="r", label="dpll")
+ax = df3.plot(kind="scatter", x="num_vars",y="cdcl_time", color="g", label="cdcl")
+# df4.plot(kind="scatter", x="num_vars",y="naive_time", color="b", label="naive", ax=ax)
 
 plt.show()
