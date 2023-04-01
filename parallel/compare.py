@@ -6,6 +6,8 @@ import pandas as pd
 import numpy as np
 import threading
 import math
+from cdcl_self import Solver
+import os
 
 class test_case:
     def __init__(self, num_vars, num_clauses, clause_length, case):
@@ -16,15 +18,28 @@ class test_case:
 
 def generate_test_case(num_vars, num_clauses, clause_length):
     test_case = []
-    for _ in range(num_clauses):
-        clause = set()
-        while len(clause) < clause_length:
-            var = random.randint(1, num_vars)
-            negated = random.choice([True, False])
-            clause.add(-var if negated else var)
-        test_case.append(list(clause))
-    
-    print('made test case #', num_vars)
+    if os.path.isfile("cases/" + str(num_vars) + ".cnf"):
+        f = open("cases/" + str(num_vars) + ".cnf", "r")
+        for line in f:
+            test_case.append([int(x) for x in line.split()])
+        print('read test case #', num_vars)
+    else:
+        
+        for _ in range(num_clauses):
+            clause = set()
+            while len(clause) < clause_length:
+                var = random.randint(1, num_vars)
+                negated = random.choice([True, False])
+                clause.add(-var if negated else var)
+            test_case.append(list(clause))
+        
+        f = open("cases/" + str(num_vars) + ".cnf", "w")
+        for clause in test_case:
+            for lit in clause:
+                f.write(str(lit) + ' ')
+            f.write('\n')
+        
+        print('made test case #', num_vars)
 
     return test_case
 
@@ -121,46 +136,43 @@ def dpll_thread(test_cases):
 
 def cdcl_thread(test_cases):
     data = []
-    solver = Glucose3()
     for idx, tc in enumerate(test_cases):
-        for clause in tc.case:
-            solver.add_clause(clause)
-
-        cdcl_time = timeit.timeit(lambda: solver.solve, number=1)
+        cdcl_time = timeit.timeit(lambda: Solver(tc.case, tc.num_vars).solve, number=1)
         data.append((tc.num_vars, tc.num_clauses, tc.clause_length, cdcl_time))
         print('solved cdcl #', idx)
     
     pd.DataFrame(data, columns=['num_vars', 'num_clauses', 'clause_length', 'cdcl_time']).to_csv('cdcl.csv')
 
 test_cases = []
-for i in range(10, 1200):
+for i in range(10, 2000):
     num_vars = i
     num_clauses = 4 * i * max(int(math.log(i)), 1)
-    clause_length = 10
+    clause_length = 8
     test_cases.append(test_case(num_vars, num_clauses, clause_length, generate_test_case(num_vars, num_clauses, clause_length)))
-    
-# t1 = threading.Thread(target=naive_thread, args=[test_cases[:20]])
-# t2 = threading.Thread(target=dpll_thread, args=[test_cases])
+
+t1 = threading.Thread(target=naive_thread, args=[test_cases[:50]])
+t2 = threading.Thread(target=dpll_thread, args=[test_cases[:400]])
 t3 = threading.Thread(target=cdcl_thread, args=[test_cases])
 
 # t1.start()
-# t2.start()
+t2.start()
 t3.start()
 
 # t1.join()
-# t2.join()
+t2.join()
 t3.join()
 
 df3 = pd.read_csv("cdcl.csv")
-# df2 = pd.read_csv("dpll.csv")
+df2 = pd.read_csv("dpll.csv")
 # df1 = pd.read_csv("naive.csv")
 
 # df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time, df1.naive_time]).transpose()
-# print(df4.shape)
-# df4.to_csv('combined.csv')
+df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time]).transpose()
+print(df4)
+df4.to_csv('combined.csv')
 
-# ax = df4.plot(kind="scatter", x="num_vars",y="dpll_time", color="r", label="dpll")
-ax = df3.plot(kind="scatter", x="num_vars",y="cdcl_time", color="g", label="cdcl")
+ax = df4.plot(kind="scatter", x="num_vars",y="dpll_time", color="r", label="dpll")
+df4.plot(kind="scatter", x="num_vars",y="cdcl_time", color="g", label="cdcl", ax=ax)
 # df4.plot(kind="scatter", x="num_vars",y="naive_time", color="b", label="naive", ax=ax)
 
 plt.show()
