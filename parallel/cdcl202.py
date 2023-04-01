@@ -5,6 +5,7 @@ import os
 import time
 from collections import deque
 import random
+from Implication import ImplicationNode
 
 TRUE = 1
 FALSE = 0
@@ -261,7 +262,7 @@ class Solver:
         where the first-assigned variable involved in the conflict was assigned
         """
         print('backtracking to %s', level)
-        for var, node in self.nodes.items():
+        for node in self.nodes.items():
             if node.level <= level:
                 node.children[:] = [child for child in node.children if child.level <= level]
             else:
@@ -288,34 +289,5 @@ class Solver:
         print('after backtracking, graph:\n%s', self.nodes)
 
 
-class ImplicationNode:
-    """
-    Represents a node in an implication graph. Each node contains
-    - its value
-    - its implication children (list)
-    - parent nodes (list)
-    """
 
-    def __init__(self, variable, value):
-        self.variable = variable
-        self.value = value
-        self.level = -1
-        self.parents = []
-        self.children = []
-        self.clause = None
-
-    def all_parents(self):
-        parents = set(self.parents)
-        for parent in self.parents:
-            for p in parent.all_parents():
-                parents.add(p)
-        return list(parents)
-
-    def __str__(self):
-        sign = '+' if self.value == TRUE else '-' if self.value == FALSE else '?'
-        return "[{}{}:L{}, {}p, {}c, {}]".format(
-            sign, self.variable, self.level, len(self.parents), len(self.children), self.clause)
-
-    def __repr__(self):
-        return str(self)
     

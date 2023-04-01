@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 import threading
 import math
-from cdcl_self import Solver
+from cdcl202 import Solver
 import os
 
 df = pd.read_csv("combined.csv")
