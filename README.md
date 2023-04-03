@@ -1,2 +1,2 @@
 # CS202-SAT
-SAT Evaluation proejct for CS202
+SAT Evaluation project for CS202
