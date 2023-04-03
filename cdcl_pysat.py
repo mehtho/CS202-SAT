@@ -12,9 +12,9 @@ def generate_test_case(num_vars, num_clauses, clause_length):
         test_case.append(tuple(clause))
     return test_case
 
-num_vars = 3
+num_vars = 10
 num_clauses = 30
-clause_length = 3
+clause_length = 10
 test_case = generate_test_case(num_vars, num_clauses, clause_length)
 
 # Instantiate the CDCL solver (Glucose3 in this case)

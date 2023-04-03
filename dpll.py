@@ -18,8 +18,10 @@ def generate_test_case(num_vars, num_clauses, clause_length):
 # If there exists a unit clause (a clause with only one literal), the literal in that clause must be assigned a truth value. The clause containing that literal and any other clauses containing the negation of that literal are removed from the formula. The DPLL algorithm is then called recursively on the simplified formula with the new assignment.
 # If there is no unit clause, a variable is selected (the first literal of the first clause is arbitrarily chosen in this implementation), and the DPLL algorithm is called recursively twice: once with the variable assigned True, and once with the variable assigned False. If either recursive call returns a satisfiable assignment, that assignment is returned.
 # If no satisfying assignment is found, the function returns False along with the current assignment.
-
+dpll_run_count = 0
 def dpll(formula, partial_assignment):
+    global dpll_run_count
+    dpll_run_count += 1
     if not formula:
         return True, partial_assignment
     
@@ -43,11 +45,13 @@ def dpll(formula, partial_assignment):
     return False, partial_assignment
 
 
-num_vars = 2
-num_clauses = 2
-clause_length = 2
+num_vars = 20
+num_clauses = 20
+clause_length = 20
 test_case = generate_test_case(num_vars, num_clauses, clause_length)
 result, assignment = dpll(test_case, [])
 print(test_case)
 print("Satisfiable:", result)
 print("Assignment:", assignment)
+print("Run Counter:", dpll_run_count)
+
