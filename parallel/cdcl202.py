@@ -5,6 +5,7 @@ import os
 import time
 from collections import deque
 import random
+import operator
 from Implication import ImplicationNode
 
 TRUE = 1
@@ -14,7 +15,7 @@ UNASSIGN = -1
 class Solver:
 
     def __init__(self, testcase, max_literal):
-        self.cnf = self.process_test_case(testcase)
+        self.cnf = testcase
         self.vars = set(range(1, max_literal + 1))
         self.learnts = set()
         self.assigns = dict.fromkeys(list(self.vars), UNASSIGN)
@@ -24,12 +25,6 @@ class Solver:
         self.branching_history = {}  # level -> branched variable
         self.propagate_history = {}  # level -> propagate variables list
         self.branching_count = 0
-    
-    def process_test_case(self, testcase):
-        cnf = set()
-        for clause in testcase:
-            cnf.add(frozenset(map(int, clause)))
-        return cnf
 
     def solve(self):
         """
@@ -40,10 +35,7 @@ class Solver:
             conf_cls = self.unit_propagate()
             if conf_cls is not None:
                 # there is conflict in unit propagation
-                print('implication nodes: \n%s', self.nodes)
                 lvl, learnt = self.conflict_analyze(conf_cls)
-                print('level reset to %s', lvl)
-                print('learnt: %s', learnt)
                 if lvl < 0:
                     return False
                 self.learnts.add(learnt)
@@ -56,17 +48,12 @@ class Solver:
                 self.level += 1
                 self.branching_count += 1
                 bt_var, bt_val = self.pick_branching_variable()
-                print('--------decision level: {:d} ---------'.format(self.level))
                 self.assigns[bt_var] = bt_val
                 self.branching_vars.add(bt_var)
                 self.branching_history[self.level] = bt_var
                 self.propagate_history[self.level] = deque()
                 self.update_graph(bt_var)
-                print('picking %s to be %s', bt_var, 'TRUE' if bt_val == TRUE else 'FALSE')
-                print('branching variables: %s', self.branching_history)
 
-            print('propagate variables: %s', self.propagate_history)
-            print('learnts: \n%s', self.learnts)
         return True
 
     def compute_value(self, literal):
@@ -78,18 +65,16 @@ class Solver:
         """
         value = self.assigns[abs(literal)]
         value = value if value == UNASSIGN else value ^ (literal < 0)
-        print('value: %s', value)
+
         return value
 
     def compute_clause(self, clause):
         values = list(map(self.compute_value, clause))
         value = UNASSIGN if UNASSIGN in values else max(values)
-        print('clause: %s, value: %s', clause, value)
+
         return value
 
     def compute_cnf(self):
-        print('cnf: %s', self.cnf)
-        print('assignments: %s', self.assigns)
         return min(map(self.compute_clause, self.cnf))
 
     def is_unit_clause(self, clause):
@@ -100,13 +85,13 @@ class Solver:
             :param clause: set of ints
             :returns: (is_clause_a_unit, the_literal_to_assign, the clause)
         """
-        print('clause: %s', clause)
+
         values = []
         unassigned = None
 
         for literal in clause:
             value = self.compute_value(literal)
-            print('value of %s: %s', literal, value)
+
             values.append(value)
             unassigned = literal if value == UNASSIGN else unassigned
 
@@ -114,8 +99,7 @@ class Solver:
                   values.count(UNASSIGN) == 1) or
                  (len(clause) == 1
                   and values.count(UNASSIGN) == 1))
-        print('%s: %s', clause, (check, unassigned))
-        print('assignments: %s', self.assigns)
+
         return check, unassigned
 
     def update_graph(self, var, clause=None):
@@ -129,7 +113,6 @@ class Solver:
                 node.parents.append(self.nodes[v])
                 self.nodes[v].children.append(node)
             node.clause = clause
-            print('node %s has parents: %s', var, node.parents)
 
     def unit_propagate(self):
         """
@@ -155,12 +138,11 @@ class Solver:
                         propagate_queue.append(prop_pair)
             if not propagate_queue:
                 return None
-            print('propagate_queue: %s', propagate_queue)
 
             for prop_lit, clause in propagate_queue:
                 prop_var = abs(prop_lit)
                 self.assigns[prop_var] = TRUE if prop_lit > 0 else FALSE
-                print('propagated %s to be %s', prop_var, self.assigns[prop_var])
+
                 self.update_graph(prop_var, clause=clause)
                 try:
                     self.propagate_history[self.level].append(prop_lit)
@@ -179,14 +161,29 @@ class Solver:
         return filter(
             lambda v: v in self.assigns and self.assigns[v] == UNASSIGN,
             self.vars)
-            
+    
+    def all_unresolved_clauses(self):
+        return filter(lambda c: self.compute_clause(c) == UNASSIGN, self.cnf)
+     
     def pick_branching_variable(self):
-        """
-        Pick a variable to assign a value.
-        :return: variable, value assigned
-        """
-        var = next(self.all_unassigned_vars())
-        return var, TRUE
+        v_pos = {x: 0 for x in self.vars if self.assigns[x] == UNASSIGN}
+        v_neg= {x: 0 for x in self.vars if self.assigns[x] == UNASSIGN}
+        for clause in self.all_unresolved_clauses():
+            for v in clause:
+                try:
+                    if v > 0:
+                        v_pos[v] += 1
+                    else:
+                        v_neg[abs(v)] += 1
+                except KeyError:
+                    pass
+
+        pos_count = max(v_pos.items(), key=operator.itemgetter(1))
+        neg_count = max(v_neg.items(), key=operator.itemgetter(1))
+        if pos_count[1] > neg_count[1]:
+            return pos_count[0], TRUE
+        else:
+            return neg_count[0], FALSE
 
     def conflict_analyze(self, conf_cls):
         """
@@ -211,10 +208,7 @@ class Solver:
         if self.level == 0:
             return -1, None
 
-        print('conflict clause: %s', conf_cls)
-
         assign_history = [self.branching_history[self.level]] + list(self.propagate_history[self.level])
-        print('assign history for level %s: %s', self.level, assign_history)
 
         pool_lits = conf_cls
         done_lits = set()
@@ -222,21 +216,16 @@ class Solver:
         prev_level_lits = set()
 
         while True:
-            print('-------')
-            print('pool lits: %s', pool_lits)
             for lit in pool_lits:
                 if self.nodes[abs(lit)].level == self.level:
                     curr_level_lits.add(lit)
                 else:
                     prev_level_lits.add(lit)
 
-            print('curr level lits: %s', curr_level_lits)
-            print('prev level lits: %s', prev_level_lits)
             if len(curr_level_lits) == 1:
                 break
 
             last_assigned, others = next_recent_assigned(curr_level_lits)
-            print('last assigned: %s, others: %s', last_assigned, others)
 
             done_lits.add(abs(last_assigned))
             curr_level_lits = set(others)
@@ -245,8 +234,6 @@ class Solver:
             pool_lits = [
                 l for l in pool_clause if abs(l) not in done_lits
             ] if pool_clause is not None else []
-
-            print('done lits: %s', done_lits)
 
         learnt = frozenset([l for l in curr_level_lits.union(prev_level_lits)])
         if prev_level_lits:
@@ -261,8 +248,7 @@ class Solver:
         Non-chronologically backtrack ("back jump") to the appropriate decision level,
         where the first-assigned variable involved in the conflict was assigned
         """
-        print('backtracking to %s', level)
-        for node in self.nodes.items():
+        for var, node in self.nodes.items():
             if node.level <= level:
                 node.children[:] = [child for child in node.children if child.level <= level]
             else:
@@ -285,9 +271,5 @@ class Solver:
                 continue
             del self.branching_history[k]
             del self.propagate_history[k]
-
-        print('after backtracking, graph:\n%s', self.nodes)
-
-
 
     

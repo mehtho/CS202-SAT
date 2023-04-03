@@ -138,42 +138,50 @@ def dpll_thread(test_cases):
 def cdcl_thread(test_cases):
     data = []
     for idx, tc in enumerate(test_cases):
-        cdcl_time = timeit.timeit(lambda: Solver(tc.case, tc.num_vars).solve, number=1)
+        cnf = set()
+        for clause in tc.case:
+            cnf.add(frozenset(map(int, clause)))
+            solver = Solver(cnf, tc.num_vars)
+
+        cdcl_time = timeit.timeit(lambda: solver.solve(), number=1)
         data.append((tc.num_vars, tc.num_clauses, tc.clause_length, cdcl_time))
         print('solved cdcl #', idx)
     
     pd.DataFrame(data, columns=['num_vars', 'num_clauses', 'clause_length', 'cdcl_time']).to_csv('cdcl.csv')
 
-test_cases = []
-for i in range(1, 2000):
-    num_vars = i
-    num_clauses = 4 * i * max(int(math.log(i)), 1)
-    clause_length = min(i, 8)
-    test_cases.append(test_case(num_vars, num_clauses, clause_length, generate_test_case(num_vars, num_clauses, clause_length)))
+def __main__():
+    test_cases = []
+    for i in range(1, 600):
+        num_vars = i
+        num_clauses = 4 * i * max(int(math.log(i)), 1)
+        clause_length = min(i, 8)
+        test_cases.append(test_case(num_vars, num_clauses, clause_length, generate_test_case(num_vars, num_clauses, clause_length)))
 
-t1 = threading.Thread(target=naive_thread, args=[test_cases[:10]])
-t2 = threading.Thread(target=dpll_thread, args=[test_cases[:400]])
-t3 = threading.Thread(target=cdcl_thread, args=[test_cases])
+    t1 = threading.Thread(target=naive_thread, args=[test_cases[:10]])
+    t2 = threading.Thread(target=dpll_thread, args=[test_cases[:300]])
+    t3 = threading.Thread(target=cdcl_thread, args=[test_cases[:60]])
 
-t1.start()
-t2.start()
-t3.start()
+    # t1.start()
+    t2.start()
+    t3.start()
 
-t1.join()
-t2.join()
-t3.join()
+    # t1.join()
+    t2.join()
+    t3.join()
 
-df3 = pd.read_csv("cdcl.csv")
-df2 = pd.read_csv("dpll.csv")
-df1 = pd.read_csv("naive.csv")
+    df3 = pd.read_csv("cdcl.csv")
+    df2 = pd.read_csv("dpll.csv")
+    df1 = pd.read_csv("naive.csv")
 
-df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time, df1.naive_time]).transpose()
-# df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time]).transpose()
-print(df4)
-df4.to_csv('combined.csv')
+    df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time, df1.naive_time]).transpose()
+    # df4 = pd.DataFrame([df3.num_vars, df3.num_clauses, df3.clause_length, df3.cdcl_time, df2.dpll_time]).transpose()
+    print(df4)
+    df4.to_csv('combined.csv')
 
-ax = df4.plot(kind="scatter", x="num_vars",y="dpll_time", color="r", label="dpll")
-df4.plot(kind="scatter", x="num_vars",y="cdcl_time", color="g", label="cdcl", ax=ax)
-df4.plot(kind="scatter", x="num_vars",y="naive_time", color="b", label="naive", ax=ax)
+    ax = df4.plot(kind="scatter", x="num_vars",y="dpll_time", color="r", label="dpll")
+    df4.plot(kind="scatter", x="num_vars",y="cdcl_time", color="g", label="cdcl", ax=ax)
+    df4.plot(kind="scatter", x="num_vars",y="naive_time", color="b", label="naive", ax=ax)
 
-plt.show()
+    plt.show()
+
+__main__()
