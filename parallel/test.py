@@ -9,14 +9,13 @@ import math
 from cdcl202 import Solver
 import os
 
-test_case = []
+test_case = set()
 num = 60
 f = open("cases/" + str(num) +".cnf", "r")
 for line in f:
-    test_case.append([int(x) for x in line.split()])
-print(test_case)
+    test_case.add(frozenset({int(x) for x in line.split()}))
 
-print(dpll(test_case, []))
+print(dpll(test_case))
 
 cnf = set()
 for clause in test_case:

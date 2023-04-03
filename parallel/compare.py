@@ -17,21 +17,20 @@ class test_case:
         self.case = case
 
 def generate_test_case(num_vars, num_clauses, clause_length):
-    test_case = []
+    test_case = set()
     if os.path.isfile("cases/" + str(num_vars) + ".cnf"):
         f = open("cases/" + str(num_vars) + ".cnf", "r")
         for line in f:
-            test_case.append([int(x) for x in line.split()])
+            test_case.add(frozenset({int(x) for x in line.split()}))
         print('read test case #', num_vars)
     else:
-        
         for _ in range(num_clauses):
             clause = set()
             while len(clause) < clause_length:
                 var = random.randint(1, num_vars)
                 negated = random.choice([True, False])
                 clause.add(-var if negated else var)
-            test_case.append(list(clause))
+            test_case.add(frozenset(clause))
         
         f = open("cases/" + str(num_vars) + ".cnf", "w")
         for clause in test_case:
@@ -95,40 +94,45 @@ def naive_thread(test_cases):
         print('solved naive #', idx)
 
     pd.DataFrame(data, columns=['num_vars', 'num_clauses', 'clause_length', 'naive_time']).to_csv('naive.csv')
-
+        
 # If the formula is empty, it is trivially satisfiable, and the current assignment is returned.
 # If any clause in the formula is empty, the formula is unsatisfiable, and the current assignment is returned.
 # If there exists a unit clause (a clause with only one literal), the literal in that clause must be assigned a truth value. The clause containing that literal and any other clauses containing the negation of that literal are removed from the formula. The DPLL algorithm is then called recursively on the simplified formula with the new assignment.
 # If there is no unit clause, a variable is selected (the first literal of the first clause is arbitrarily chosen in this implementation), and the DPLL algorithm is called recursively twice: once with the variable assigned True, and once with the variable assigned False. If either recursive call returns a satisfiable assignment, that assignment is returned.
 # If no satisfying assignment is found, the function returns False along with the current assignment.
-
-def dpll(formula, assignment):
-    if not formula:
-        return True, assignment
+def __select_literal(cnf):
+    for c in cnf:
+        for literal in c:
+            return literal
+        
+def dpll(cnf, assignments=set()):
+ 
+    if len(cnf) == 0:
+        return True, assignments
+ 
+    if any([len(c)==0 for c in cnf]):
+        return False, None
     
-    if any(not clause for clause in formula):
-        return False, assignment
-    
-    unit_clauses = [c for c in formula if len(c) == 1]
-    if unit_clauses:
-        unit = unit_clauses[0][0]
-        new_formula = [[l for l in c if l != -unit] for c in formula if unit not in c]
-        return dpll(new_formula, assignment + [unit])
-    
-    variable = abs(formula[0][0])
-    
-    for value in [variable, -variable]:
-        new_formula = [[l for l in c if l != -value] for c in formula if value not in c]
-        result, new_assignment = dpll(new_formula, assignment + [value])
-        if result:
-            return result, new_assignment
-
-    return False, assignment
+    l = __select_literal(cnf)
+ 
+    new_cnf = [c for c in cnf if l not in c]
+    new_cnf = [c.difference({-abs(l)}) for c in new_cnf]
+    sat, vals = dpll(new_cnf, assignments=assignments.union({abs(l)}))
+    if sat:
+        return sat, vals
+         
+    new_cnf = [c for c in cnf if -l not in c]
+    new_cnf = [c.difference({(abs(l))}) for c in new_cnf]
+    sat, vals = dpll(new_cnf, assignments=assignments.union({-abs(l)}))
+    if sat:
+        return sat, vals
+ 
+    return False, None
     
 def dpll_thread(test_cases):
     data = []
     for idx, tc in enumerate(test_cases):
-        dpll_time = timeit.timeit(lambda: dpll(tc.case, []), number=1)
+        dpll_time = timeit.timeit(lambda: dpll(tc.case), number=1)
         data.append((tc.num_vars, tc.num_clauses, tc.clause_length, dpll_time))
 
         print('solved dpll #', idx)
@@ -151,14 +155,14 @@ def cdcl_thread(test_cases):
 
 def __main__():
     test_cases = []
-    for i in range(1, 600):
+    for i in range(1, 60):
         num_vars = i
-        num_clauses = 4 * i * max(int(math.log(i)), 1)
+        num_clauses = (2**i)**2 
         clause_length = min(i, 8)
         test_cases.append(test_case(num_vars, num_clauses, clause_length, generate_test_case(num_vars, num_clauses, clause_length)))
 
     t1 = threading.Thread(target=naive_thread, args=[test_cases[:10]])
-    t2 = threading.Thread(target=dpll_thread, args=[test_cases[:300]])
+    t2 = threading.Thread(target=dpll_thread, args=[test_cases[:60]])
     t3 = threading.Thread(target=cdcl_thread, args=[test_cases[:60]])
 
     # t1.start()
