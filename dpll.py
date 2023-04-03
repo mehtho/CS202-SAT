@@ -45,12 +45,13 @@ def dpll(formula, partial_assignment):
     return False, partial_assignment
 
 
-num_vars = 20
-num_clauses = 20
-clause_length = 20
+var = 20
+num_vars = var
+num_clauses = 2**(var-1)
+clause_length = var
 test_case = generate_test_case(num_vars, num_clauses, clause_length)
 result, assignment = dpll(test_case, [])
-print(test_case)
+#print(test_case)
 print("Satisfiable:", result)
 print("Assignment:", assignment)
 print("Run Counter:", dpll_run_count)

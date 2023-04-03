@@ -1,5 +1,6 @@
 import random
-from pysat.solvers import Glucose3
+import timeit
+from pysat.solvers import Solver
 
 def generate_test_case(num_vars, num_clauses, clause_length):
     test_case = []
@@ -12,25 +13,28 @@ def generate_test_case(num_vars, num_clauses, clause_length):
         test_case.append(tuple(clause))
     return test_case
 
-num_vars = 10
-num_clauses = 30
-clause_length = 10
+var =13
+num_vars = var
+num_clauses = 2**var * 2**var
+clause_length = var
 test_case = generate_test_case(num_vars, num_clauses, clause_length)
 
 # Instantiate the CDCL solver (Glucose3 in this case)
-solver = Glucose3()
+solver = Solver(name ="g3",bootstrap_with=None, use_timer=True)
 
 # Add clauses to the solver
 for clause in test_case:
     solver.add_clause(clause)
 
 # Solve the problem
+time = timeit.timeit(lambda: solver.solve(), number = 1)
 solution = solver.solve()
-
-print(test_case)
+start_time = solver.time()
+# print(test_case)
 if solution:
     print("SATISFIABLE")
     print(solver.get_model())
+    print(time)
 else:
     print("UNSATISFIABLE")
 
