@@ -222,6 +222,7 @@ class Solver:
         else:
             level = self.level - 1
 
+        print(learnt)
         return level, learnt
 
     def backtrack(self, level):
